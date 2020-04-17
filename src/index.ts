@@ -33,6 +33,7 @@ const typeDefs = gql`
     moves: [String]
     # moves(max: Int): PokemonMoves     # different data source
     hasAbilities: [Ability]
+    hasTypes: [Type]
   }
   
   type PokemonMoves {
@@ -43,6 +44,11 @@ const typeDefs = gql`
   type Ability {
     name: String
     belongsTo: [Pokemon]
+  }
+  
+  type Type {
+    name: String
+    hasPokemons(limit: Int): [Pokemon]
   }
 `;
 
@@ -93,6 +99,13 @@ const resolvers = {
       return abilities.map(async (ability) => {
         return await axios.get(ability.ability.url);
       })
+    },
+    hasTypes: async (pokemon, {}) => {
+      const types = pokemon.types;
+
+      return types.map(async (type) => {
+        return await axios.get(type.type.url);
+      })
     }
   },
   Ability: {
@@ -105,6 +118,24 @@ const resolvers = {
       for (let key in ability.data.pokemon) {
         let pokemon = await axios.get(ability.data.pokemon[key].pokemon.url);
         pokemons.push(pokemon.data);
+      }
+
+      return pokemons;
+    }
+  },
+  Type: {
+    name: (type) => {
+      return type.data.name;
+    },
+    hasPokemons: async (type, {limit = 999}, context) =>{
+      const pokemons = [];
+      let counter = 0;
+
+      for (let key in type.data.pokemon) {
+        let pokemon = await axios.get(type.data.pokemon[key].pokemon.url);
+        pokemons.push(pokemon.data);
+        counter++;
+        if (counter > limit) break;
       }
 
       return pokemons;
