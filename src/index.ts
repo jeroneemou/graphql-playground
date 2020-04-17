@@ -97,7 +97,6 @@ const resolvers = {
   },
   Ability: {
     name: (ability) => {
-      console.log(ability);
       return ability.data.name;
     },
     belongsTo: async (ability, {}, context) => {
