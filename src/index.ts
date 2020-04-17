@@ -12,12 +12,15 @@ const typeDefs = gql`
   type Query {
     getPokemons(limit: Int, offset: Int): [Pokemon]
     getPokemon(name: String): Pokemon
+    "See your favourite pokemon."
     load: Pokemon
   }
   
   # Mutation entry type
   type Mutation {
+    "Save your favourite pokemon."
     save(input: PokemonInput): Pokemon
+    "Delete your favourite pokemon."
     clean: Boolean
   }
   
@@ -27,8 +30,12 @@ const typeDefs = gql`
   }
     
   # Pokemon object type
+  "Pokemon!"
   type Pokemon { 
     id: Int                             # field
+    """
+    Look at all the moves pokemon has.
+    """
     name(encoded: Boolean): String      # field with arguments
     moves: [String]
     # moves(max: Int): PokemonMoves     # different data source
