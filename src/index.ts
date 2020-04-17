@@ -1,122 +1,133 @@
 import { GraphQLServer } from 'graphql-yoga';
-import axios from 'axios';
-import { promises as fs } from 'fs';
-
-import { GraphQLObjectType, GraphQLString, GraphQLList, GraphQLInt, GraphQLSchema } from 'graphql';
-import {fetchPokemon} from "./sources/pokeapi";
-import {clean, read, store} from "./sources/file";
+import {fetchPokemon, fetchPokemons} from "./sources/pokeapi";
+import {clean, load, save} from "./sources/file";
+import gql from 'graphql-tag';
+import axios from "axios";
 import {fetchMoves} from "./sources/pogoapi";
 
-
-const typeDefs = `
-
+// Type definitions
+const typeDefs = gql`
+  
+  # Query entry type
   type Query {
-    pokemon(id: Int): Pokemon
-    stored: Pokemon
+    getPokemons(limit: Int, offset: Int): [Pokemon]
+    getPokemon(name: String): Pokemon
+    load: Pokemon
   }
   
+  # Mutation entry type
   type Mutation {
-    store(input: PokemonInput): Pokemon
+    save(input: PokemonInput): Pokemon
     clean: Boolean
   }
   
-  type Pokemon {
-    id: Int
-    name: String
-    moves(max: Int): PokemonMoves
-  }
-  
+  # Mutation inputs
   input PokemonInput {
-    id: Int
+    name: String
+  }
+    
+  # Pokemon object type
+  type Pokemon { 
+    id: Int                             # field
+    name(encoded: Boolean): String      # field with arguments
+    moves: [String]
+    # moves(max: Int): PokemonMoves     # different data source
+    hasAbilities: [Ability]
   }
   
   type PokemonMoves {
     fast: [String]
     charged: [String]
   }
+
+  type Ability {
+    name: String
+    belongsTo: [Pokemon]
+  }
 `;
 
-// const pokemonMovesType = new GraphQLObjectType({
-//   name: 'PokemonMoves',
-//   fields: () => ({
-//     charged: {
-//       type: new GraphQLList(GraphQLString),
-//     },
-//     fast: {
-//       type: new GraphQLList(GraphQLString),
-//     }
-//   }),
-// });
-//
-// const queryType = new GraphQLObjectType({
-//   name: 'Query',
-//   fields: {
-//     moves: {
-//       type: pokemonMovesType,
-//       // `args` describes the arguments that the `user` query accepts
-//       args: {
-//         id: { type: GraphQLInt }
-//       },
-//       resolve: async (_, {id}) => {
-//         return await fetchMoves(id);
-//       }
-//     }
-//   }
-// });
-
+// Resolvers
 const resolvers = {
   Query: {
-    pokemon: async (obj, { id }, context) => {
-      const pokemon = await fetchPokemon(id);
-
-      return {
-        id: pokemon.data.id,
-        name: pokemon.data.name
-      }
+    // Resolution of query fields
+    getPokemons: async (root, {limit, offset}, context) => {
+      return await fetchPokemons(limit, offset);
     },
-    stored: async (obj, args, context) => {
-      return read();
+    getPokemon: async (root, { name }, context) => {
+      return await fetchPokemon(name);
+    },
+    load: async () => {
+      return await load();
     }
   },
   Mutation: {
-    store: async (obj, { input }, context) => {
-      const pokemon = await store(input.id);
-
-      return {
-        id: pokemon.data.id,
-        name: pokemon.data.name
-      }
+    save: async (root, { name }) => {
+      return await save(name);
     },
     clean: async () => {
-      await clean();
+      return await clean();
     }
   },
   Pokemon: {
-    moves: async (obj, { max = 999 }, context) => {
-      const pokemonMoves = await fetchMoves(obj.id);
+    // Resolution of pokemon fields
+    id: (pokemon) => { return pokemon.id },
+    name: (pokemon, {encoded}) => {
+      return encoded ? Buffer.from(pokemon.name).toString('base64') : pokemon.name;
+    },
+    moves: async (pokemon) => {
+      return pokemon.moves.map((move) => {
+        return move.move.name;
+      })
+    },
+    // moves: async (pokemon, { max = 999 }, context) => {
+    //   const pokemonMoves = await fetchMoves(pokemon.id);
+    //
+    //   return {
+    //     charged: pokemonMoves.charged_moves.slice(0, max),
+    //     fast: pokemonMoves.fast_moves.slice(0,max)
+    //   }
+    // },
+    hasAbilities: async (pokemon, {}) => {
+      const abilities = pokemon.abilities;
 
-      return {
-        charged: pokemonMoves.charged_moves.slice(0, max),
-        fast: pokemonMoves.fast_moves.slice(0,max)
+      return abilities.map(async (ability) => {
+        return await axios.get(ability.ability.url);
+      })
+    }
+  },
+  Ability: {
+    name: (ability) => {
+      console.log(ability);
+      return ability.data.name;
+    },
+    belongsTo: async (ability, {}, context) => {
+      const pokemons = [];
+
+      for (let key in ability.data.pokemon) {
+        let pokemon = await axios.get(ability.data.pokemon[key].pokemon.url);
+        pokemons.push(pokemon.data);
       }
+
+      return pokemons;
     }
   }
 };
 
-
+// Configure server
 const server = new GraphQLServer({
   typeDefs,
   resolvers,
-  // schema: new GraphQLSchema({
-  //   query: queryType
-  // }),
   context: ({request, response}) => {
     return {
       request,
       response,
-      whatever: "I want!"
+      whatever: "I want!",
+      // data sources
+      // controllers
+      // anything!
     }
   },
 });
 
+// Start server
 server.start(() => console.log('Server is running on http://localhost:4000'));

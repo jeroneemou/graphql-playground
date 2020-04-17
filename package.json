@@ -12,6 +12,8 @@
   "author": "Devan Beitel",
   "license": "ISC",
   "dependencies": {
+    "graphiql": "^0.17.5",
+    "graphql-tag": "^2.10.3",
     "graphql-yoga": "1.18.3"
   },
   "devDependencies": {
