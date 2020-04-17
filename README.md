@@ -80,7 +80,7 @@ mutation ClearSavedPokemon {
 # race conditions during these side‐effects.
 ```
 
-Backup
+Nested and introspection
 ```
 query FetchPokemon($name: String = "ditto", $maxMoves: Int = 999) {
   getPokemon(name: $name) {
